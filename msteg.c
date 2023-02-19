@@ -436,21 +436,6 @@ int main(int argc, const char *argv[]){
 
 
 
-/* TODO
-
-	So, we need to unify reading for bin & string and writing into functions
-	writing: mediafp, outfp (file or stdout),
-		>for a command line string, place it in a tmp file, rewind, and pass tmpfp
-	reading: mediafp, infp (file or stdin), 
-
-
-	Use the data's tag to determine to read out as filedata or as a string.
-	Maybe use a wrapper function to check and then call the correct extraction method
-
-
-*/
-
-
 	if(list_stat){
 		print_bmp_stats(fp);
 	}
@@ -464,41 +449,6 @@ int main(int argc, const char *argv[]){
 		fprintf(stderr, "No actions specified. Nothing to do.\n");
 	}
 	
-
-/*
-	if(!strcmp(argv[1], "-s")){
-		print_bmp_stats(fp);
-	}
-	else if(!strcmp(argv[1], "-r")){
-		bmp_data_extract_print(fp);
-	}
-	else if(!strcmp(argv[1], "-w")){
-		if(argc < 4){
-			printf("Last argument needs to be a string to write.\n");
-			fclose(fp);
-			return(-1);
-		}
-		bmp_data_embed((char*)argv[3], fp);
-		printf("Done embedding data.\n");
-	}	
-	else if(!strcmp(argv[1], "-f")){
-		if(argc < 4){
-			printf("Last argument needs to be a file to write.\n");
-			fclose(fp);
-			return(-1);
-		}
-		FILE *fsrc = fopen(argv[3], "rb");
-		bmp_file_embed(fsrc, fp);
-	}
-	else if(!strcmp(argv[1], "-x")){
-		bmp_file_extract(fp);
-	}
-	else{
-		printf("Invalid option.\n");
-		fclose(fp);	
-		return(-1);
-	}
-*/
 	fclose(fp);
 	argpc_close(&pc);
 	return(0);
