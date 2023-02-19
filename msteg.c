@@ -34,7 +34,11 @@ For more information, please refer to <http://unlicense.org/>
 #include <string.h>
 #include <stdint.h>
 
-#include <arpa/inet.h>
+//#include <arpa/inet.h>
+#include "argp.h"
+
+#define TRUE 1
+#define FALSE 0
 
 #define CHUNK_SIZE 32
 #define FIELD_SIZE 4
@@ -42,7 +46,7 @@ For more information, please refer to <http://unlicense.org/>
 #define STR_TAG 0x01
 #define BIN_TAG 0x02
 
-
+#define FILE_WRITE_CHUNK_SIZE 512
 
 int strcmpb(uint8_t *src, const uint8_t *dst, int size){
 	int i=0;
@@ -103,7 +107,7 @@ uint8_t bmp_data_get(int i, FILE *fp){
 
 
 
-int print_bmp_data(FILE *fp){
+int print_bmp_stats(FILE *fp){
 	fseek(fp, 0x0002, SEEK_SET);
 	int dat;
 	fread(&dat, sizeof(dat), 1, fp);
@@ -140,52 +144,36 @@ int print_bmp_data(FILE *fp){
 	return(0);
 }
 
-int bmp_data_embed(char *str, FILE *fp){
-	int data_start = get_bmp_data_start(fp);
-	fseek(fp, data_start, SEEK_SET);
+int bmp_write_string(FILE *media, char *str){
 	
-	if(strlen(str) >= get_max_data_size(fp)){
-		fprintf(stderr, "This data is too large to store in this file.\n");
+	if(strlen(str) >= get_max_data_size(media)){
+		fprintf(stderr, "This data is too large to store in this media file.\n");
 		return(-1);
 	}
 
 	/* add the tag for a string */
-	bmp_data_set(STR_TAG, 0, fp);	
+	bmp_data_set(STR_TAG, 0, media);	
 
 	int i=1;
 	uint8_t b, c;
 	char *s = str;
 	while(*s != 0){
-		bmp_data_set(*s, i, fp);
+		bmp_data_set(*s, i, media);
 		i++;
 		s++;
 	}
-	bmp_data_set(0, i, fp);
+	bmp_data_set(0, i, media);
 
 	return(0);
 }
 
 
-int bmp_data_extract_print(FILE *fp){
-	int data_start = get_bmp_data_start(fp);
-	fseek(fp, data_start, SEEK_SET);
-	
-	/* get the data type and make sure it is valid */
-	uint8_t type = bmp_data_get(0, fp);
-	if(type == BIN_TAG){
-		fprintf(stderr, "This file contains binary data. Please dump it to a file.");
-		return(-1);
-	}
-	else if(type != STR_TAG){
-		fprintf(stderr, "This file was never modified.\n");
-		return(-1);
-	}			
-
+int bmp_read_string(FILE *media, FILE *out){
 	int i=1;
 	uint8_t b, c=0;
 	do{
-		c = bmp_data_get(i, fp);
-		fprintf(stdout, "%c", c);
+		c = bmp_data_get(i, media);
+		fprintf(out, "%c", c);
 		i++;
 	}while(c != 0);
 	printf("\n");
@@ -194,14 +182,13 @@ int bmp_data_extract_print(FILE *fp){
 }
 
 
-int bmp_file_embed(FILE *src, FILE *fp){
-	int max = get_max_data_size(fp)-4;  
-	uint8_t datbuf[16];
+int bmp_write_file(FILE *media, FILE *src){
+	int max = get_max_data_size(media)-4;  
+	uint8_t datbuf[FILE_WRITE_CHUNK_SIZE];
 	int data_size = 0, i=0, index=5;
 
 	/* embed the file tag */
-	printf("Writing file data to image.\n");
-	bmp_data_set(BIN_TAG, 0, fp);	
+	bmp_data_set(BIN_TAG, 0, media);	
 
 
 	/* embed the file size (4-bytes) */
@@ -209,29 +196,29 @@ int bmp_file_embed(FILE *src, FILE *fp){
 	unsigned int file_size = ftell(src);
 	rewind(src);
 	if(file_size > max){
-		fprintf(stderr, "Error. File too large. Aborting.");
+		fprintf(stderr, "Error. File too large for this media container. Aborting.\n");
 		return(-1);		
 	}
 
-	printf("Writing file size: %d\n", file_size);
+	fprintf(stderr, "Writing a file of size: %d bytes\n", file_size);
 
-	bmp_data_set((uint8_t)(file_size & 0x000000FF), 1, fp);
-	bmp_data_set((uint8_t)((file_size & 0x0000FF00) >> 8), 2, fp);
-	bmp_data_set((uint8_t)((file_size & 0x00FF0000) >> 16), 3, fp);
-	bmp_data_set((uint8_t)((file_size & 0xFF000000) >> 24), 4, fp);
+	bmp_data_set((uint8_t)(file_size & 0x000000FF), 1, media);
+	bmp_data_set((uint8_t)((file_size & 0x0000FF00) >> 8), 2, media);
+	bmp_data_set((uint8_t)((file_size & 0x00FF0000) >> 16), 3, media);
+	bmp_data_set((uint8_t)((file_size & 0xFF000000) >> 24), 4, media);
 
 	/* write file data */
 	do{
-		data_size = fread(datbuf, 1, 16, src);
-		for(i=0; i<16; i++){
-			bmp_data_set(datbuf[i], index, fp);
+		data_size = fread(datbuf, 1, FILE_WRITE_CHUNK_SIZE, src);
+		for(i=0; i<FILE_WRITE_CHUNK_SIZE; i++){
+			bmp_data_set(datbuf[i], index, media);
 			index++;
 			if(index > max){
-				fprintf(stderr, "Error. File too large. Aborting.");
+				fprintf(stderr, "Error. File too large for media. Aborting.");
 				return(-1);
 			}
 		}
-	}while(data_size == 16);
+	}while(data_size == FILE_WRITE_CHUNK_SIZE);
 	
 	return(0);
 }
@@ -239,38 +226,24 @@ int bmp_file_embed(FILE *src, FILE *fp){
 
 
 
-int bmp_file_extract(FILE *fp){
-	int data_start = get_bmp_data_start(fp);
-	fseek(fp, data_start, SEEK_SET);
+int bmp_read_file(FILE *media, FILE *out){
 	
-	/* get the data type and make sure it is valid */
-	uint8_t type = bmp_data_get(0, fp);
-	if(type == STR_TAG){
-		fprintf(stderr, "This file contains text data.  Please read it with \"-r\".\n");
-		return(-1);
-	}
-	else if(type != BIN_TAG){
-		fprintf(stderr, "This file was never modified. Tag: %02x\n", type);
-		return(-1);
-	}			
-
-	unsigned int file_size = 0;
-	unsigned int seg;
-	file_size = (unsigned int)bmp_data_get(1, fp);
-	seg = (unsigned int)(bmp_data_get(2, fp) << (8*1));
+	uint64_t file_size = 0;
+	uint64_t seg;
+	file_size = (uint64_t)bmp_data_get(1, media);
+	seg = (uint64_t)(bmp_data_get(2, media) << (8*1));
 	file_size |= seg;
-	seg = (unsigned int)(bmp_data_get(3, fp) << (8*2));
+	seg = (uint64_t)(bmp_data_get(3, media) << (8*2));
 	file_size |= seg;
-	seg = (unsigned int)(bmp_data_get(4, fp) << (8*3));
+	seg = (uint64_t)(bmp_data_get(4, media) << (8*3));
 	file_size |= seg;
-
-	fprintf(stderr, "File size: %08x\n", file_size);
+	fprintf(stderr, "Extracting file of size: %ld bytes.\n", file_size);
 
 	int i=5; /* start indexing after tag and filesize bytes */
 	uint8_t b, c=0;
 	do{
-		c = bmp_data_get(i, fp);
-		fprintf(stdout, "%c", c);
+		c = bmp_data_get(i, media);
+		fprintf(out, "%c", c);
 		i++;
 	}while(--file_size > 0);
 
@@ -278,21 +251,177 @@ int bmp_file_extract(FILE *fp){
 }
 
 
+int bmp_write_stream(FILE *media, FILE *stream){
+		
+	/* add the tag for a string */
+	bmp_data_set(STR_TAG, 0, media);	
+
+	int i=1; /* start at one to skip tag */
+	uint8_t b;
+	char c;
+	do{
+		c = fgetc(stream);
+		bmp_data_set(c, i, media);
+		i++;
+	}while(!feof(stream));
+	bmp_data_set(0, i, media);
+	
+	return(0);
+}
+
+
+
+int bmp_read(FILE *media, FILE *out){
+	int data_start = get_bmp_data_start(media);
+	fseek(media, data_start, SEEK_SET);
+
+	uint8_t tag;
+
+	/* check tag */
+	tag = bmp_data_get(0, media);
+	if(tag != STR_TAG && tag != BIN_TAG){
+		fprintf(stderr, "Error: Media file was never modified. Tag: [%02X]\n", tag);
+		return(-1);
+	}
+
+	if(tag == BIN_TAG){
+		bmp_read_file(media, out);
+		return(0);
+	}
+	
+	if(tag == STR_TAG){
+		bmp_read_string(media, out);
+		return(0);
+	}
+	
+	fprintf(stderr, "Error: Issue with source code in bmp_read().\n");
+	return(-1);
+}
+
+
+int bmp_write(FILE *media, FILE *in, char *str, int stream){
+	int data_start = get_bmp_data_start(media);
+	fseek(media, data_start, SEEK_SET);
+	
+	if(str != NULL){
+		bmp_write_string(media, str);
+		return(0);
+	}
+	else if(in == stdin || stream){
+		if(in == NULL){
+			fprintf(stderr, "Error: input stream is null.\n");
+		}
+		bmp_write_stream(media, in);
+		return(0);
+	}
+	else if(in != NULL){
+		bmp_write_file(media, in);
+		return(0);
+	}
+
+	fprintf(stderr, "Error: Invalid input to bmp_write. No input was given.\n");
+	return(-1);
+}
+
+
 
 
 int main(int argc, const char *argv[]){
-	if(argc < 3){
-		printf("Not enough args.\n");
+	
+	struct argpc pc;
+	argpc_init(argc, &pc);
+
+	FILE *outfp, *infp;
+
+	int pos;
+	uint8_t list_stat = FALSE, \
+	handle_bin = FALSE, \
+	file_read = FALSE, \
+	file_write = FALSE, \
+	force_stream = FALSE;
+	
+	char *infile = NULL, \
+	*outfile = NULL, \
+	*media_filename = NULL, \
+	*input_string = NULL;
+
+	/* check argument options */
+	if(has_argp(argc, argv, &pc, 0, 4, "t", "-stat", "l", "--list")){
+		list_stat = TRUE;
+	}
+	if( (pos = has_argp(argc, argv, &pc, 1, 2, "i", "-input")) != 0){
+		infile = (char *)argv[pos+1];
+	}
+	if( (pos = has_argp(argc, argv, &pc, 1, 2, "o", "-output")) != 0){
+		outfile = (char *)argv[pos+1];
+	}
+	/*if( (pos = has_argp(argc, argv, &pc, 0, 5, "b", "-bin", "-binary", "f", "-file")) != 0){
+		handle_bin = TRUE;
+	}*/
+	if( (pos = has_argp(argc, argv, &pc, 1, 2, "s", "-string")) != 0){
+		input_string = (char *)argv[pos+1];
+	}
+	if( (pos = has_argp(argc, argv, &pc, 0, 2, "r", "-read")) != 0){
+		file_read = TRUE;
+	}
+	if( (pos = has_argp(argc, argv, &pc, 0, 2, "w", "-write")) != 0){
+		file_write = TRUE;
+	}
+	if( (pos = has_argp(argc, argv, &pc, 0, 1, "-stream")) != 0){
+		force_stream = TRUE;
+	}
+
+
+	/* check for invalid arguments*/
+	if(pos = inval_argp(argc, argv, &pc)){
+		fprintf(stderr, "Error: Invalid argument at position %d.\n", pos);
 		return(-1);
 	}
 
-	if(*argv[1] != '-'){
-		printf("No valid operaiton flag detected.\n Please use \'-r/w/s.\'\n");
+	if(!unuse_argp(argc, argv, &pc)){
+		fprintf(stderr, "Error: No free arguments. Please provide a media file container.\n");
 		return(-1);
 	}
 
+	if(pc.free){
+		/* first free argument should be the media filename */
+		media_filename = pc.args[0];
+	}
+	else{
+		fprintf(stderr,"Error: Could not find any specified media file.\n");
+	}
 
-	FILE *fp = fopen(argv[2], "r+b"); /* open for reading and writing */
+	
+
+	if(infile){
+		if(handle_bin){
+			infp = fopen(infile, "rb");
+		}
+		else{
+			infp = fopen(infile, "r");
+		}
+	}
+	else{
+		infp = stdin;
+	}
+
+	if(outfile){
+		if(handle_bin){
+			outfp = fopen(outfile, "wb");
+		}
+		else{
+			outfp = fopen(outfile, "w");
+		}
+	}
+	else{
+		outfp = stdout;
+	}
+
+
+
+
+	/* TODO: update this filetype detection */
+	FILE *fp = fopen(media_filename, "r+b");
 
 	uint8_t chunk[CHUNK_SIZE];
 	memset(chunk, 0, CHUNK_SIZE);
@@ -300,13 +429,45 @@ int main(int argc, const char *argv[]){
 	fread(chunk, 1, 8, fp);
 
 	if(strcmpb(chunk, "BM", 2)){
-		printf("This is not a BMP file.\n");
+		fprintf(stderr, "Error: This is not a BMP file.\n");
 		fclose(fp);
 		return(-1);
 	}	
 
+
+
+/* TODO
+
+	So, we need to unify reading for bin & string and writing into functions
+	writing: mediafp, outfp (file or stdout),
+		>for a command line string, place it in a tmp file, rewind, and pass tmpfp
+	reading: mediafp, infp (file or stdin), 
+
+
+	Use the data's tag to determine to read out as filedata or as a string.
+	Maybe use a wrapper function to check and then call the correct extraction method
+
+
+*/
+
+
+	if(list_stat){
+		print_bmp_stats(fp);
+	}
+	else if(file_read){
+		bmp_read(fp, outfp);
+	}
+	else if(file_write){
+		bmp_write(fp, infp, input_string, force_stream);
+	}
+	else{
+		fprintf(stderr, "No actions specified. Nothing to do.\n");
+	}
+	
+
+/*
 	if(!strcmp(argv[1], "-s")){
-		print_bmp_data(fp);
+		print_bmp_stats(fp);
 	}
 	else if(!strcmp(argv[1], "-r")){
 		bmp_data_extract_print(fp);
@@ -337,8 +498,9 @@ int main(int argc, const char *argv[]){
 		fclose(fp);	
 		return(-1);
 	}
-
-	fclose(fp);	
+*/
+	fclose(fp);
+	argpc_close(&pc);
 	return(0);
 }
 

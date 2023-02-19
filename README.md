@@ -17,7 +17,7 @@ sudo make install
 ## Usage
 To list that stats of a file, run the following command:
 ```
-msteg -s [file]
+msteg --stat [file]
 ```
 Write a string into a file:
 ```
@@ -31,11 +31,11 @@ msteg -r [file]
 ### Writing a file into the media
 To embed the file:
 ```
-msteg -f [media] [content]
+msteg -w -i [input-file] [media]
 ```
 To extract the file:
 ```
-msteg -x [media] > [output]
+msteg -r -o [output] [media]
 ```
 
 

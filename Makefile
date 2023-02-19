@@ -1,12 +1,13 @@
 
 INSTALL_DIR=/usr/bin/
 SOURCES=msteg.c
+HEADERS=argp.h
 TARGET=msteg
 CC=cc
 
 all: msteg
 
-msteg: $(SOURCES)
+msteg: $(SOURCES) $(HEADERS)
 	$(CC) $(SOURCES) -o $(TARGET)
 
 clean:
