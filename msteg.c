@@ -418,10 +418,29 @@ int main(int argc, const char *argv[]){
 	}
 
 
+	/* make sure files opened */
+	if(outfp == NULL || infp == NULL){
+		fprintf(stderr, "Error: Could not open I/O file.\n");
+		argpc_close(&pc);
+		if(outfp != stdout && outfp != NULL){fclose(outfp);}
+		if(infp != stdin && infp != NULL){fclose(infp);}
+		return(-1);
+	}
+
 
 
 	/* TODO: update this filetype detection */
 	FILE *fp = fopen(media_filename, "r+b");
+
+	if(fp == NULL){
+		fprintf(stderr, "Error: Could not open media file.\n");
+		argpc_close(&pc);
+		if(outfp != stdout && outfp != NULL){fclose(outfp);}
+		if(infp != stdin && infp != NULL){fclose(infp);}
+		return(-1);
+	}
+
+
 
 	uint8_t chunk[CHUNK_SIZE];
 	memset(chunk, 0, CHUNK_SIZE);
