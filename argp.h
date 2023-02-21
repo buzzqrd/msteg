@@ -20,7 +20,9 @@ struct argpc {
 void argpc_init(int argc, struct argpc *pc){
 	pc->free = 0;
 	pc->len = (int *)malloc(argc * sizeof(int));
+	memset(pc->len, 0, argc * sizeof(int));
 	pc->args = (char **)malloc(argc * sizeof(char *));
+	memset(pc->args, 0, argc * sizeof(char *));
 	return;
 }
 
