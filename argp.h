@@ -26,6 +26,7 @@ void argpc_init(int argc, struct argpc *pc){
 
 void argpc_close(struct argpc *pc){
 	free(pc->len);
+	free(pc->args);
 	return;
 }
 
