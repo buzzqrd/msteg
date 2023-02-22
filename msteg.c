@@ -406,7 +406,7 @@ int main(int argc, const char *argv[]){
 	}
 
 	if(outfile){
-		if(handle_bin){
+		if(handle_bin){ 
 			outfp = fopen(outfile, "wb");
 		}
 		else{
@@ -429,7 +429,6 @@ int main(int argc, const char *argv[]){
 
 
 
-	/* TODO: update this filetype detection */
 	FILE *fp = fopen(media_filename, "r+b");
 
 	if(fp == NULL){
@@ -442,6 +441,7 @@ int main(int argc, const char *argv[]){
 
 
 
+	/* TODO: update this filetype detection */
 	uint8_t chunk[CHUNK_SIZE];
 	memset(chunk, 0, CHUNK_SIZE);
 
@@ -449,6 +449,7 @@ int main(int argc, const char *argv[]){
 
 	if(strcmpb(chunk, "BM", 2)){
 		fprintf(stderr, "Error: This is not a BMP file.\n");
+		argpc_close(&pc);
 		fclose(fp);
 		return(-1);
 	}	
