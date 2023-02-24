@@ -1,7 +1,7 @@
 
 INSTALL_DIR=/usr/bin/
 SOURCES=msteg.c
-HEADERS=argp.h
+HEADERS=argp.h bmp.h defs.h
 TARGET=msteg
 CC=cc
 
