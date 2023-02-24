@@ -34,7 +34,6 @@ For more information, please refer to <http://unlicense.org/>
 #include <string.h>
 #include <stdint.h>
 
-//#include <arpa/inet.h>
 #include "argp.h"
 
 #define TRUE 1
