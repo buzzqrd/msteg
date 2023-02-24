@@ -46,6 +46,11 @@ The current supported media types are:
 
 Upcoming updates will soon include a man page and help page, as well as better support for stdin and stdout.
 
+### Future Plans
+- PNG support
+- Variation in bit usage (not just the lowest order bit)
+- Passcodes to change the encoding pattern
+
 ## Contributing
 Contributions are welcome to this repository. The main goal of this project is to make a simple, lightweight, portable C implementation of a steganographic tool. Any contributions that help to fulfill this goal are greatly appreciated.
 
